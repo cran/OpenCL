@@ -1,5 +1,58 @@
 NEWS for the OpenCL package
 
+0.2-1	2020-03-03
+    o   OpenCL context and command queue can be persisted, allowing to keep data
+        between calls. The context also remembers whether to default to single-
+        or double-precision for numeric vectors.
+
+    o   Data can stay on the OpenCL device (GPU) between kernel calls. This is
+        extremely valuable when working with discrete GPUs connected over a
+        relatively slow PCIe connection.
+
+    o   A single-precision data type is no longer required. The conversion takes
+        place when transferring the data to the OpenCL device. On the R side,
+        data remains in numeric vectors.
+
+    o   Kernels are executed asynchronously and possibly out-of-order, if the
+        OpenCL implementation allows it. Synchronization need not to be done
+        manually and happens without the user knowing: OpenCL events
+        corresponding to a kernel execution are attached to the output buffer.
+        Following kernel executions having the buffer as input then wait for the
+        event, hence for the preceding kernel execution to finish. Likewise,
+        reads from buffers wait on the attached event as well.
+
+    o   OpenCL device information is amended by maximum frequency. Also the list
+        of extensions is broken down to make it easier searchable.
+
+    o   By default, we choose GPU devices. CPU devices usually don't make a lot
+        of sense. Also, if there are multiple GPU devices available - think of
+        a notebook with integrated and discrete GPU - we try to choose the
+        faster device.
+
+    o   There are now several tests covering most of the functionality.
+
+    o	Windows configuration has been simplified. On Windows, you
+	have to set the OCL environemnt variable to the root of the
+	OpenCL SDK. By default the CPPFLAGS and LIBS will be
+	constrcuted from that location depending on whether 32-bit or
+	64-bit binaries are produced by appending lib/x64/OpenCL.lib
+	or lib/x86/OpenCL.lib respecitvely. Includes are assumed to be
+	in the includes directory. All of the above can be overridden
+	by setting OCLINC to the necessary pre-processor flags and
+	OCL32LIB or OCL64LIB for 32-bit and 64-bit linker flags.
+	(Note that OCL must still be set even if you override all
+	flags)
+
+
+0.1-4
+    o	devices with very long extensions strings could cause error
+	on retrieval. Fixed with larger static buffer.
+	(Thanks to Valerio Aimale again)
+
+    o	Improve error reporting by always including the OpenCL
+	error code
+
+
 0.1-3	2012-05-25
     o	fix a bug causing device enumeration to use the default
 	device for device count regradless of the specified type.
@@ -21,6 +74,7 @@ NEWS for the OpenCL package
     o	kernels objects are now less cryptic - they implement
 	print(), names() and $ methods for access to their attributes.
 
+
 0.1-2	2012-03-07
     o	add the support for asynchronous calls, i.e., execution
 	parallel to the CPU or multiple parallel GPU operations.
@@ -29,6 +83,7 @@ NEWS for the OpenCL package
 	results later.
 
     o	minor cleanup
+
 
 
 0.1-1	2011-08-09
