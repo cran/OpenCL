@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "ocl.h"
 
 #define USE_RINTERNALS 1
@@ -102,7 +103,6 @@ attribute_visible SEXP ocl_context(SEXP device_exp)
     queue = clCreateCommandQueue(ctx, device_id, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &last_ocl_error);
     /* Some implementations don't support the out-of-order flag, retry without. */
     if (!queue && last_ocl_error == CL_INVALID_VALUE) {
-        Rf_warning("OpenCL implementation does not support out-of-order execution, disabling it");
         queue = clCreateCommandQueue(ctx, device_id, 0, &last_ocl_error);
     }
     if (!queue)
@@ -120,6 +120,58 @@ static SEXP getDeviceInfo(cl_device_id device_id, cl_device_info di) {
     if (last_ocl_error != CL_SUCCESS)
 	ocl_err("clGetDeviceInfo", last_ocl_error);
     return Rf_mkString(infobuf);
+}
+
+attribute_visible SEXP ocl_get_device_info_entry(SEXP device, SEXP sDI, SEXP sConv) {
+    SEXP res;
+    unsigned char infobuf[2048];
+    size_t out_size = 0, n_el, i = 0;
+    int conv = Rf_asInteger(sConv);
+    cl_device_id device_id = getDeviceID(device);
+    cl_int last_ocl_error = clGetDeviceInfo(device_id, (cl_device_info) (unsigned int) asInteger(sDI),
+					    sizeof(infobuf), &infobuf, &out_size);
+    if (last_ocl_error != CL_SUCCESS)
+	ocl_err("clGetDeviceInfo", last_ocl_error);
+    switch (conv) {
+    case 2:
+	{
+	    n_el = out_size / 2;
+	    res = Rf_allocVector(INTSXP, n_el);
+	    int *res_i = INTEGER(res);
+	    unsigned char *c = infobuf;
+	    while (i < n_el) {
+		res_i[i++] = (int) (((unsigned int) c[0]) | (((unsigned int) c[1]) << 8));
+		c += 2;
+	    }
+	}
+	break;
+    case 4:
+	{
+	    n_el = out_size / sizeof(cl_uint);
+	    /* we must use real, because we could not store unsigned ints in R */
+	    res = Rf_allocVector(REALSXP, n_el);
+	    double *res_d = REAL(res);
+	    cl_uint *c = (cl_uint*) infobuf;
+	    while (i < n_el)
+		res_d[i++] = (double) *(c++);
+	}
+	break;
+    case 8:
+	{
+	    n_el = out_size / sizeof(cl_ulong);
+	    res = Rf_allocVector(REALSXP, n_el);
+	    double *res_d = REAL(res);
+	    cl_ulong *c = (cl_ulong*) infobuf;
+	    while (i < n_el)
+		res_d[i++] = (double) *(c++);
+	}
+	break;
+    default:
+	res = Rf_allocVector(RAWSXP, out_size);
+	if (out_size)
+	    memcpy(RAW(res), infobuf, out_size);
+    }
+    return res;
 }
 
 static SEXP getPlatformInfo(cl_platform_id platform_id, cl_device_info di) {
@@ -184,7 +236,7 @@ attribute_visible SEXP ocl_ez_kernel(SEXP context, SEXP k_name, SEXP code, SEXP 
     cl_kernel kernel;
     const char* options = (get_type(mode) == CLT_FLOAT) ?
         "-cl-single-precision-constant" : NULL;
-    cl_int last_ocl_error;
+    cl_int last_ocl_error, build_log_ocl_error;
     size_t log_len = 0;
 
     if (TYPEOF(k_name) != STRSXP || LENGTH(k_name) != 1)
@@ -197,34 +249,37 @@ attribute_visible SEXP ocl_ez_kernel(SEXP context, SEXP k_name, SEXP code, SEXP 
     {
 	int sn = LENGTH(code), i;
 	const char **cptr;
-	cptr = (const char **) malloc(sizeof(char*) * sn);
-        if (cptr == NULL)
-            Rf_error("Out of memory");
+	cptr = (const char **) R_alloc(sn, sizeof(char*));
 	for (i = 0; i < sn; i++)
 	    cptr[i] = CHAR(STRING_ELT(code, i));
 	program = clCreateProgramWithSource(ctx, sn, cptr, NULL, &last_ocl_error);
-	free(cptr);
 	if (!program)
 	    ocl_err("clCreateProgramWithSource", last_ocl_error);
     }
 
     last_ocl_error = clBuildProgram(program, 1, &device, options, NULL, NULL);
-    if (clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_len) == CL_SUCCESS && log_len > 1)
-    {
-        char *buffer = malloc(log_len);
-        if (buffer) {
-            if (clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_len, buffer, NULL) == CL_SUCCESS)
-                R_ShowMessage(buffer);
-            else
-                R_ShowMessage("Could not obtain build log");
-            free(buffer);
-        }
-        else
-            R_ShowMessage("Could not allocate build log buffer");
+    build_log_ocl_error = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_len);
+    if (build_log_ocl_error != CL_SUCCESS)
+        ocl_warn("clGetProgramBuildInfo", build_log_ocl_error);
+    else if (log_len > 1) {
+        char *buffer = R_alloc(log_len, 1);
+	build_log_ocl_error = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_len, buffer, NULL);
+	if (build_log_ocl_error == CL_SUCCESS) {
+	    /* ok, we have the log - now this may be an error or just a message */
+	    if (last_ocl_error != CL_SUCCESS) {
+		clReleaseProgram(program);
+		Rf_error("clBuildProgram failed with oclError: %d, %s, build log:\n%s",
+			 last_ocl_error, ocl_errstr(last_ocl_error), buffer);
+	    } else {
+		/* in most cases when a log exists it means there was a compilation warning */
+		Rf_warning("OpenCL kernel compilation:\n%s", buffer);
+	    }
+	} else
+	    ocl_warn("clGetProgramBuildInfo", build_log_ocl_error);
     }
     if (last_ocl_error != CL_SUCCESS) {
         clReleaseProgram(program);
-        Rf_error("clBuildProgram failed (with %d)", last_ocl_error);
+        ocl_err("clBuildProgram", last_ocl_error);
     }
 
     kernel = clCreateKernel(program, CHAR(STRING_ELT(k_name, 0)), &last_ocl_error);
@@ -308,7 +363,23 @@ attribute_visible SEXP ocl_call(SEXP args) {
                 Rf_error("More arguments than expected");
             if (TYPEOF(wait_exp) == EXTPTRSXP)
                 input_wait[wait_events++] = getEvent(wait_exp);
-        } else {
+        } else if (Rf_inherits(arg, "clLocal")) {
+	    size_t buf_n, buf_elt, buf_size;
+	    int et = Rf_asInteger(VECTOR_ELT(arg, 1));
+	    SEXP sLen = VECTOR_ELT(arg, 0);
+	    if (TYPEOF(sLen) == REALSXP) {
+		double n_r = REAL(sLen)[0];
+		buf_n = (size_t) n_r;
+	    } else
+		buf_n = (size_t) Rf_asInteger(sLen);
+	    if (et == -1)
+		et = (ftype == CLT_FLOAT) ? 4 : 8;
+	    buf_elt = (size_t) et;
+	    buf_size = buf_n * buf_elt;
+	    last_ocl_error = clSetKernelArg(kernel, an++, buf_size, 0);
+            if (last_ocl_error != CL_SUCCESS)
+                Rf_error("Failed to kernel argument %d to local buffer of size %lu (error %d)", an, (unsigned long) buf_size, last_ocl_error);
+	} else {
             // single-value argument
             if (LENGTH(arg) != 1)
                 Rf_error("Non-buffer arguments must be scalar values");

@@ -6,6 +6,9 @@ there are several implementations based on this standard. Each
 implementation is usually specific to a brand of a computing device
 (such as GPU, CPU or accelerator).
 
+For special considerations pertaining to the Windows operating system,
+see last section of this document.
+
 
 *** OpenCL IMPLEMENTATIONS ***
 
@@ -26,9 +29,9 @@ apt-get install nvidia-opencl-dev
 Type: GPU, CPU
 Vendor: Apple
 This OpenCL implementation is part of Mac OS X 10.6 (Snow Leopard) and
-Max OS X 10.7 (Lion) operating systems. The OpenCL package has been
-successfully tested with nVidia GPU devices (only single-precision is
-supported on the devices available to us).
+above. The OpenCL package has been successfully tested with nVidia GPU
+devices (both single and double precision) and Apple M1 (single
+precision only).
 The OpenCL framework is part of the OS so no additional libraries need
 to be installed.
 
@@ -71,9 +74,50 @@ set the PKG_CFLAGS and/or PKG_LIBS environment variables accordingly
 (and possibly LD_LIBRARY_PATH on some unix systems), see R
 documentation on this.
 
+*** Windows ***
+
+Due to limitations of the Windows operating system there is a conflict
+between the OpenCL package DLL and any other DLL called
+OpenCL.DLL including those of OpenCL vendors. Therefore if the
+vendor-supplied DLL is called "OpenCL.dll", it must be loaded first,
+__before__ the package is loaded. For example:
+
+dyn.load("C:/Windows/System32/OpenCL.dll", FALSE, TRUE)
+library(OpenCL)
+
+(This assumes your OpenCL.dll by the vendor has been installed into
+the system location.)
+For this reason, statically linked OpenCL is recommended if provided
+by the vendor (consult the vendor documentation).
+
+
+INSTALLATION: When compiling OpenCL for Windows, you have to set the
+OCL environment variable to the root of the OpenCL SDK. For example,
+if installing from R, you can use `Sys.setenv()`:
+
+Sys.setenv(OCL="C:/CUDA/v12.1")
+
+The defaults assume that the headers are in "$SDK/include" and
+libraries in "$SDK/lib/x64/OpenCL.lib" and "$SDK/lib/x86/OpenCL.lib"
+respectively (where $SDK is the SDK root). More recent versions of R
+will only require 64-bit libraries.
+
+You can also set individual variables OCLINC, OCL32LIB and OCL64LIB
+with the necessary compiler flags if the locations are
+non-standard. Note that the flags are passed inside single quotes to
+R, so if multiple separate flags have to be set, they need to be
+separated by ' ', e.g.:
+
+Sys.setenv(OCL64LIB="C:/OpenCL/lib' '-lOpenCL")
+
+Please refer to the vendor's documentation for the necessary flags and
+locations.
+
+For recent single-architecture R versions (typically 64-bit only) the
+environment variable OCLLIB can be used instead of OCL64LIB.
 
 ---
 
 DISCLAIMER: Product or corporate names may be trademarks or registered
 trademarks, and are used only for identification and explanation
-wihtout intent to infringe.
+without intent to infringe.
