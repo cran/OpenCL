@@ -1,10 +1,22 @@
 NEWS for the OpenCL package
 
-0.2-10
+0.2-11	2025-01-19
+    o	Do not issue kernel compiler warning if the build log
+	string consists solely of whitespaces. (#21)
+
+    o	Replace DATAPTR with INTEGER/REAL to be API compliant.
+
+
+0.2-10	2023-12-22
     o	Adjust header declaration for ocl_get_device_info_entry.
 
     o	Windows: for single-arch R fall back to $OCL/lib/OpenCL.lib
 	if present.
+
+    o	oclPlatforms() will return an empty list with a warning when
+	encountering `CL_PLATFORM_NOT_FOUND_KHR` when using Khronos
+	ICD while no vendor driver is found. (Previously this would
+	lead to an error).
 
 
 0.2-9	2023-11-29

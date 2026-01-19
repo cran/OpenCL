@@ -1,8 +1,8 @@
-6c1a10efe1b8c7c975519c9d2fc010f6 *DESCRIPTION
-80f0ebafd9f696f84977208477d4aba1 *INSTALL
+4fb10b058f1787d4af8cf8e17ee008e5 *DESCRIPTION
+7f3967d8f90ac918457efcb8b4a32c36 *INSTALL
 007257e96622f600a19616d7168c37da *LICENSE
 f3bb928e2253ac6318aaf1896dd4fdc4 *NAMESPACE
-3c4738eccf18f1b247f764aad6b9b0c9 *NEWS
+f6d049d37442eaf3292b00eec6d0fd08 *NEWS
 1bfc175dbe99dbcb4ad3a2980c95d7c2 *R/clBuffer.R
 d7ddda90c7f32c698661aebf17d16b65 *R/clLocal.R
 62d656a380abf2e8c0746e16a360e927 *R/ocl.R
@@ -17,9 +17,9 @@ d7ddda90c7f32c698661aebf17d16b65 *R/clLocal.R
 9cefbb559fede441d2ae81c9ecb13a3a *man/oclRun.Rd
 3ce13a4a07a771dc78ae65737c1d6f3c *man/oclSimpleKernel.Rd
 c156aeb79990f86c27da9596772c1c83 *src/Makevars
-0d3ec61d6100e7a83ed02f98f26a3056 *src/buffer.c
+2e1897c51a5cc707ce42fa362d72d3d4 *src/buffer.c
 1ade3193d30ddc780311086c3573df64 *src/c.h
-aa28eb8040a4d5c50d1ca4eea72992d8 *src/ocl.c
+58d8a532dbb5cd0ac8d656bd204088a5 *src/ocl.c
 5f402b969daab171f4846ea2cf423466 *src/ocl.h
 0b62389c5abf931d347403a61a2a3f8c *src/oclerr.c
 1071b07abc680719bf3d27362aa7b8a1 *src/reg.c
